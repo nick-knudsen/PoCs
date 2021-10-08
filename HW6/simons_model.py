@@ -1,27 +1,9 @@
-import numpy
 import random
-from string import ascii_uppercase
-from itertools import cycle
+import numpy as np
+from collections import Counter
+from scipy.stats import linregress
+import matplotlib.pyplot as plt
 
-population = ['A']
-
-# the rich get richer model
-# takes:
-#       rho, the probability of innovation at any one time step
-#       len, how long to run the model for
-def simons_model(rho, len):
-    # naming of groups
-    name = 'B'
-    repeats = 0
-    # time steps
-    for t in range(len):
-        # innovation with prob rho
-        if random.random() <= rho:
-            population.append(name)
-            name = name_next_group(name)
-        else:
-            population.append(random.choice(population))
-            
 # get the next string in the sequence ...ABX, ABY, ABZ, ACA, ACB...
 def name_next_group(curr_name):
     all_zs = True
@@ -40,3 +22,45 @@ def name_next_group(curr_name):
     if all_zs:
         new_name = "A"*(len(curr_name)+1)
     return "".join(new_name)
+
+# the rich get richer model
+# takes:
+#       rho, the probability of innovation at any one time step
+#       steps, how long to run the model for
+def simons_model(rho, steps):
+    population = [1]
+    groups = 1
+    # time steps
+    for t in range(steps):
+        # innovation with prob rho
+        if random.random() <= rho:
+            groups += 1
+            population.append(groups)
+        else:
+            population.append(random.choice(population))
+    return population
+            
+rhos = [0.1, 0.01, 0.001]
+for rho in rhos:
+    sims = 10
+    steps = 1000000
+    results = []
+    # run the simulation sims times and aggregate results
+    for j in range(sims):
+        results.extend(simons_model(rho, steps))
+    
+    # get counts for each group
+    avg_counts = ({k: v/10 for k, v in dict(Counter(results)).items()})
+    rank = list(avg_counts.keys())
+    freq = list(avg_counts.values())
+
+    mod = linregress(np.log10(rank), np.log10(freq))
+    beta = -mod.slope
+    alpha = 1 - rho
+
+    plt.plot(np.log10(rank), np.log10(freq))
+    plt.plot(np.log10(rank), mod.intercept+np.log10(rank)*mod.slope)
+    plt.title("rho = "+ str(rho) + " beta = " + str(round(beta, 3)))
+    plt.xlabel("log group number")
+    plt.ylabel("log group size")
+    plt.savefig("zipfian_simon_model_rho_"+str(rho).replace('.','_')+".png")
