@@ -42,8 +42,8 @@ def simons_model(rho, steps):
             
 rhos = [0.1, 0.01, 0.001]
 for rho in rhos:
-    sims = 10
-    steps = 1000000
+    sims = 100
+    steps = 100000
     results = []
     # run the simulation sims times and aggregate results
     for j in range(sims):
@@ -58,6 +58,7 @@ for rho in rhos:
     beta = -mod.slope
     alpha = 1 - rho
 
+    plt.figure()
     plt.plot(np.log10(rank), np.log10(freq))
     plt.plot(np.log10(rank), mod.intercept+np.log10(rank)*mod.slope)
     plt.title("rho = "+ str(rho) + " beta = " + str(round(beta, 3)))
