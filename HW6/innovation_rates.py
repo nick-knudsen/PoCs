@@ -20,7 +20,7 @@ def ulysses():
     totalNumWords = df['count'].sum()
     uniqueWords = len(counts)
     rho_est = uniqueWords/totalNumWords
-    print("Frac: ", rho_est)
+    print("rho est.: ", rho_est)
     freq = Counter(counts)
     #print("Freq: ", freq)
 
@@ -78,5 +78,6 @@ def monte_cristo():
     n3 = freq[3]/sum(freq.values())
     print(f'{n1:.3f}  {n2:.3f}  {n3:.3f}')
 
+ulysses()
 pride_and_prej()
 monte_cristo()
