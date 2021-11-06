@@ -1,10 +1,13 @@
 using PyCall
 using Random
 using StatsBase
+using Plots
+using GLM
 
 plt = pyimport("matplotlib.pyplot")
 display = pyimport("IPython.display")
 ndimage = pyimport("scipy.ndimage")
+stats = pyimport("scipy.stats")
 
 # probability of a spark at a given site
 get_site_prob(row, col, l) = ℯ^(-1*(row/l))*ℯ^(-1*(col/l))
@@ -85,32 +88,38 @@ function draw_world(world::Array{Int,2})
 end
 
 function main()
-    avg_yields = Vector{Float64}()
-    max_yield = 0
-    max_matrix = nothing
+    
     # dimension
-    Ls = [32,64,128]
+    Ls = [128]
     
     # number of randomly chosen placements of the next tree
     for L in Ls
-        l= L/10
-        D = [1, 2, L]
+        D = [1,2,16] 
         probs = make_site_probs(L)
+        avg_yields_mat = Array{Float64}(undef, length(D), L^2)
         max_matrices = []
 
         forest_sizes = Vector{Vector{Int64}}()
 
-        @time for d in D
+        @time for (i, d) in pairs(D)
+            println("L = "*string(L)*"  D = "*string(d))
+            avg_yields = Vector{Float64}()
+            max_yield = 0
+            max_matrix = nothing
             world = zeros(Int, L,L)
+            tree_num = 0
             while zero(eltype(world)) in world
                 avg_yield, sample_world = choose_tree(d, world, probs, L)
+                tree_num += 1
                 if avg_yield > max_yield
                     max_yield = avg_yield
                     max_matrix = deepcopy(sample_world)
                 end
                 push!(avg_yields, avg_yield) 
+                print("\rGrowing tree "*string(tree_num)*"/"*string(L^2))
             end
             push!(max_matrices, max_matrix)
+            avg_yields_mat[i,:] = avg_yields
             conn_comps, num_conn_comps = ndimage.label(max_matrix,[[0,1,0],[1,1,1],[0,1,0]])
             forest_sizes_for_d = Vector{Int64}()
             
@@ -122,8 +131,9 @@ function main()
             
             push!(forest_sizes,forest_sizes_for_d)
 
-            println(max_yield)
-            println(sum(max_matrix))
+            println()
+            println("Max Yield: "*string(max_yield))
+            println("Density: "*string(sum(max_matrix)/L^2))
         end
         
 
@@ -136,21 +146,36 @@ function main()
         for i=1:length(D)
             forest_sizes_for_d = forest_sizes[i]
             sort!(forest_sizes_for_d, rev=true)
-            plt.figure()
-            fig = plt.scatter(log10.(1:length(forest_sizes_for_d)), log10.(forest_sizes_for_d))
-            
-            fig.title = "L D"
-            plt.savefig(folder*"/zipf_L_"*string(L)*"_d_"*string(D[i])*".png")
+            log_ranks = log10.(1:length(forest_sizes_for_d))
+            log_forest_sizes = log10.(forest_sizes_for_d)
+            slope, intercept, rvalue, pvalue, se = stats.linregress(log_ranks, log_forest_sizes)
 
+            plt.figure()
+            fig = plt.scatter(log_ranks, log_forest_sizes)
+            plt.plot(log_ranks, intercept .+ slope*log_ranks)
+            plt.title("L: "*string(L)*" D: "*string(D[i])*" α: "*string(round(-slope, digits=3)))
+            plt.xlabel("log_10 rank")
+            plt.ylabel("log_10 forest size")
+            plt.savefig(folder*"/zipf_L_"*string(L)*"_d_"*string(D[i])*".png")
             plt.clf()
+
             fig, ax = plt.subplots(figsize=(10, 10))
             ax.set_ylim(0,L)
             ax.set_xlim(0,L)
             ax.set_aspect("equal")
-
             draw_world(max_matrices[i])
+            plt.title("D="*string(D[i])*" L="*string(L), fontsize=20)
             plt.savefig(folder*"/max_yield_"*"L_"*string(L)*"_d_"*string(D[i])*".png")
+            plt.clf()
+
+
         end 
+        densities = [i/L^2 for i=1:L^2]
+        plot(densities, avg_yields_mat', labels=reshape("D=".*string.(D), 1, :), legend=:topleft, fmt = png, size=(700,500))
+        title!("Yield Density Curves")
+        xlabel!("Density")
+        ylabel!("Yield")
+        savefig(folder*"/yield_density_"*"L_"*string(L)*"_d_"*".png")
     end
 end
 
